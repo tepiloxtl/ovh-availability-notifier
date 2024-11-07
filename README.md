@@ -1,5 +1,5 @@
 # ovh-availability-notifier
-This is still WIP, but it works if used delicately. Each destination can support however many SKUs, but they are all send separately for now
+This is still WIP, but it works if used delicately. Each destination can support however many SKUs, but they are all send separately for now. Supports Discord webhook and ntfy
 
 On first run it will print available offers with their ids
 
