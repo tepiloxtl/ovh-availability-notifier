@@ -15,6 +15,7 @@ destinations = [{"type": "discord",
                   "sku": ["24ska01"]},
                 {"type": "ntfy",
                   "url": "your webhook here",
+                 "auth": "your Basic or Bearer token"
                   "sku": ["24ska01"]}]
 
 # , ["24skgame01-sgp", "24skgame01-sgp.ram-32g-noecc-2133.hybridsoftraid-2x450nvme-1x4000sa"]
@@ -46,7 +47,8 @@ def notify_ntfy(destination, offername, offer):
         headers={
             "Title": offerlist[offername]['invoiceName'] + " availability",
             "Priority": "urgent",
-            "Tags": tags
+            "Tags": tags,
+            "Authorization": destination["auth"]
         })
 
 
