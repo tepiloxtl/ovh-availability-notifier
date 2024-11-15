@@ -18,6 +18,9 @@ destinations = [{"type": "discord",
                  "auth": "your Basic or Bearer token",
                   "sku": ["24ska01"]}]
 
+# https://healthchecks.io/, skipped if empty or None
+healthcheck = ""
+
 # , ["24skgame01-sgp", "24skgame01-sgp.ram-32g-noecc-2133.hybridsoftraid-2x450nvme-1x4000sa"]
 
 def notify_discord(destination, offername, offer):
@@ -99,4 +102,6 @@ while True:
 
 
     changedoffers = {}
+    if healthcheck:
+        requests.post(healthcheck)
     time.sleep(60)
