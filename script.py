@@ -1,14 +1,12 @@
-import requests, json, time, pprint
+import requests, time, pprint, datetime
 
 endpoint = "https://eu.api.ovh.com/v1"
 listurl = "/order/catalog/public/eco?ovhSubsidiary="
 checkurl = "/dedicated/server/datacenter/availabilities?planCode="
+#Offer availability may vary based on country code
 country = "PL"
-
-offerlistjson = requests.get(endpoint + listurl + country).json()
-offerlist = {}
-currentoffers = {}
-changedoffers = {}
+#Interval between API calls
+interval = 60
 
 destinations = [{"type": "discord",
                   "url": "your webhook here",
@@ -23,37 +21,54 @@ healthcheck = ""
 
 # , ["24skgame01-sgp", "24skgame01-sgp.ram-32g-noecc-2133.hybridsoftraid-2x450nvme-1x4000sa"]
 
-def notify_discord(destination, offername, offer):
-    data = {"username": "OVH Eco checker"}
-    avl = ""
-    color = "15548997"
-    for av in offer:
-        avl = avl + av + ": " + offer[av] + "\n"
-        if offer[av] != "unavailable":
-            color = "5763719"
-    #print(avl)
-    data["embeds"] = [{'title': offerlist[offername]['invoiceName'], 'description': offerlist[offername]["price"], 'color': color, 'footer': {'text': ''}, 'author': {'name': 'OVH Eco checker'}, 'fields': [{'name': 'availability:', 'value': avl, 'inline': True}]}]
-    swh = requests.post(destination["url"], json=data)
-    #print(swh.text)
+def notify_discord(type, destination, offername, offer):
+    if type == True:
+        data = {"username": "OVH Eco checker"}
+        avl = ""
+        color = "15548997"
+        for av in offer:
+            avl = avl + av + ": " + offer[av] + "\n"
+            if offer[av] != "unavailable":
+                color = "5763719"
+        #print(avl)
+        data["embeds"] = [{'title': offerlist[offername]['invoiceName'], 'description': offerlist[offername]["price"], 'color': color, 'footer': {'text': ''}, 'author': {'name': 'OVH Eco checker'}, 'fields': [{'name': 'availability:', 'value': avl, 'inline': True}]}]
+        swh = requests.post(destination["url"], json=data)
+        #print(swh.text)
+    elif type == False:
+        data = {"username": "OVH Eco checker", "content": offername}
+        swh = requests.post(destination["url"], json=data)
 
-def notify_ntfy(destination, offername, offer):
-    tags = "x"
-    avl = ""
-    for av in offer:
-        avl = avl + av + ": " + offer[av] + "\n"
-        if offer[av] != "unavailable":
-            tags = "white_check_mark"
-    tags = tags + "," + offername
-    #print(avl)
-    requests.post(destination["url"],
-        data=avl,
-        headers={
-            "Title": offerlist[offername]['invoiceName'] + " availability",
-            "Priority": "urgent",
-            "Tags": tags,
-            "Authorization": destination["auth"]
-        })
 
+def notify_ntfy(type, destination, offername, offer):
+    if type == True:
+        tags = "x"
+        avl = ""
+        for av in offer:
+            avl = avl + av + ": " + offer[av] + "\n"
+            if offer[av] != "unavailable":
+                tags = "white_check_mark"
+        tags = tags + "," + offername
+        #print(avl)
+        requests.post(destination["url"],
+            data=avl,
+            headers={
+                "Title": offerlist[offername]['invoiceName'] + " availability",
+                "Priority": "urgent",
+                "Tags": tags,
+                "Authorization": destination["auth"]
+            })
+    elif type == False:
+        requests.post(destination["url"],
+            data=offername,
+            headers={
+                "Title": "Error occured",
+                "Authorization": destination["auth"]
+            })
+
+offerlistjson = requests.get(endpoint + listurl + country).json()
+offerlist = {}
+currentoffers = {}
+changedoffers = {}
 
 currency = offerlistjson["locale"]["currencyCode"]
 
@@ -85,7 +100,19 @@ while True:
         temp = {}
         if item not in currentoffers:
             currentoffers[item] = {}
-        offer = requests.get(endpoint + checkurl + item).json()
+        try:
+            offer = requests.get(endpoint + checkurl + item).json()
+        except:
+            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " could not reach API endpoint")
+            if lasterror != 1:
+                for destination in destinations:
+                    if destination["type"] == "discord":
+                        notify_discord(False, destination, "Could not reach API endpoint", 0)
+                    elif destination["type"] == "ntfy":
+                        notify_ntfy(False, destination, "could not reach API endpoint", 0)
+                lasterror = 1
+            time.sleep(interval)
+            continue
         for item2 in offer[0]["datacenters"]:
             temp[item2["datacenter"]] = item2["availability"]
         if currentoffers[item] != temp:
@@ -96,12 +123,13 @@ while True:
         for offer in destination["sku"]:
             if offer in changedoffers:
                 if destination["type"] == "discord":
-                    notify_discord(destination, offer, changedoffers[offer])
+                    notify_discord(True, destination, offer, changedoffers[offer])
                 elif destination["type"] == "ntfy":
-                    notify_ntfy(destination, offer, changedoffers[offer])
+                    notify_ntfy(True, destination, offer, changedoffers[offer])
 
 
     changedoffers = {}
     if healthcheck:
         requests.post(healthcheck)
-    time.sleep(60)
+    lasterror = 0
+    time.sleep(interval)
