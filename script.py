@@ -69,6 +69,7 @@ offerlistjson = requests.get(endpoint + listurl + country).json()
 offerlist = {}
 currentoffers = {}
 changedoffers = {}
+lasterror = {}
 
 currency = offerlistjson["locale"]["currencyCode"]
 
@@ -92,6 +93,7 @@ for destination in destinations:
     for item in destination["sku"]:
         if item not in tocheck:
             tocheck.append(item)
+            lasterror[item] = 0
 
 # 120H┃1440H┃1H-high┃1H-low┃2160H┃240H┃24H┃480H┃720H┃72H┃comingSoon┃unavailable┃unknown
 
@@ -103,21 +105,32 @@ while True:
         try:
             offer = requests.get(endpoint + checkurl + item).json()
         except:
-            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " could not reach API endpoint")
-            if lasterror != 1:
+            print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " could not reach API endpoint")
+            if lasterror[item] != 1:
                 for destination in destinations:
                     if destination["type"] == "discord":
                         notify_discord(False, destination, "Could not reach API endpoint", 0)
                     elif destination["type"] == "ntfy":
                         notify_ntfy(False, destination, "could not reach API endpoint", 0)
-                lasterror = 1
-            time.sleep(interval)
+                lasterror[item] = 1
             continue
-        for item2 in offer[0]["datacenters"]:
-            temp[item2["datacenter"]] = item2["availability"]
+        try:
+            for item2 in offer[0]["datacenters"]:
+                temp[item2["datacenter"]] = item2["availability"]
+        except:
+            print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " Offer " + str(item) + " does not exists")
+            if lasterror[item] != 2:
+                for destination in destinations:
+                    if destination["type"] == "discord":
+                        notify_discord(False, destination, "Offer " + str(item) + " does not exists", 0)
+                    elif destination["type"] == "ntfy":
+                        notify_ntfy(False, destination, "Offer " + str(item) + " does not exists", 0)
+                lasterror[item] = 2
+            continue
         if currentoffers[item] != temp:
             currentoffers[item] = temp
             changedoffers[item] = currentoffers[item]
+            lasterror[item] = 0
 
     for destination in destinations:
         for offer in destination["sku"]:
@@ -131,5 +144,4 @@ while True:
     changedoffers = {}
     if healthcheck:
         requests.post(healthcheck)
-    lasterror = 0
     time.sleep(interval)
